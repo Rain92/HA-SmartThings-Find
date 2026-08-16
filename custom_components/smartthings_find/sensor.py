@@ -6,8 +6,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 
 from .const import DOMAIN
-from .utils import get_battery_level
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -27,12 +25,14 @@ class DeviceBatterySensor(SensorEntity):
     def __init__(self, hass: HomeAssistant, coordinator, device):
         """Initialize the sensor."""
         self.coordinator = coordinator
-        self._attr_unique_id = f"stf_device_battery_{device['data']['dvceID']}"
-        self._attr_name = f"{device['data']['modelName']} Battery"
+        device_id = device['data'].get("device_id")
+        name = device['data'].get("name") or device_id or "SmartThings Find"
+        self._attr_unique_id = f"stf_device_battery_{device_id}"
+        self._attr_name = f"{name} Battery"
         self._state = None
         self.hass = hass
         self.device = device['data']
-        self.device_id = device['data']['dvceID']
+        self.device_id = device_id
         self._attr_device_info = device['ha_dev_info']
         self._attr_device_class = SensorDeviceClass.BATTERY
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -47,7 +47,7 @@ class DeviceBatterySensor(SensorEntity):
         if not tag_data:
             _LOGGER.info(f"battery sensor: tag_data none for '{self.name}'; rendering state unavailable")
             return False
-        if not tag_data['update_success']:
+        if not tag_data.get('update_success'):
             _LOGGER.info(f"Last update for battery sensor '{self.name}' failed; rendering state unavailable")
             return False
         return True
@@ -58,5 +58,5 @@ class DeviceBatterySensor(SensorEntity):
     
     @property
     def state(self):
-        ops = self.coordinator.data.get(self.device_id, {}).get('ops', [])
-        return get_battery_level(self.name, ops)
+        data = self.coordinator.data.get(self.device_id, {})
+        return data.get('battery_level')

@@ -1,15 +1,13 @@
 # SmartThings Find Integration for Home Assistant
 
-This is a fork of [Vedeneb/HA-SmartThings-Find](https://github.com/Vedeneb/HA-SmartThings-Find), which was archived by its original author. This fork is actively maintained.
+This is a fork of [Vedeneb/HA-SmartThings-Find](https://github.com/Vedeneb/HA-SmartThings-Find) (archived by its original author), merging in the OAuth 2.0/PKCE login rework from [PixelShober/HA-SmartThings-Find](https://github.com/PixelShober/HA-SmartThings-Find), which replaced the unstable JSESSIONID web-login scraping (broken by a Samsung account login redesign) with the OAuth flow used by official Samsung apps. This fork is actively maintained.
 
 This integration adds support for devices from Samsung SmartThings Find. While intended mainly for Samsung SmartTags, it also works with other devices, such as phones, tablets, watches and earbuds.
 
-Currently the integration creates three entities for each device:
+Currently the integration creates these entities (trackers only):
 * `device_tracker`: Shows the location of the tag/device.
 * `sensor`: Represents the battery level of the tag/device (not supported for earbuds!)
-* `button`: Allows you to ring the tag/device.
-
-![screenshot](media/screenshot_1.png)
+* `switch`: Optimistic ring toggle (auto turns off after 120s).
 
 This integration does **not** allow you to perform actions based on button presses on the SmartTag! There are other ways to do that.
 
@@ -18,10 +16,10 @@ This integration does **not** allow you to perform actions based on button press
 
 - **API Limitations**: Created by reverse engineering the SmartThings Find API, this integration might stop working at any time if changes occur on the SmartThings side.
 - **Limited Testing**: The integration hasn't been thoroughly tested. If you encounter issues, please report them by creating an issue.
-- **Feature Constraints**: The integration can only support features available on the [SmartThings Find website](https://smartthingsfind.samsung.com/). For instance, stopping a SmartTag from ringing is not possible due to API limitations (while other devices do support this; not yet implemented)
+- **Feature Constraints**: The integration can only support features available on the [SmartThings Find website](https://smartthingsfind.samsung.com/). Ring stop is exposed for trackers, but support depends on the backend; if it fails the API will reject the command. The ring switch is optimistic because the ring status cannot be read from the OAuth API.
 
 ## Notes on authentication
-The integration simulates Samsung login using QR code. It stores the retrieved JSESSIONID-Cookie and uses it for further requests. **It is not yet known, how long exactly the session is valid!** While it did work at least for several weeks for me and others, there's no definite answer and the session might become invalid anytime! As a precaution I implemented a reauth-flow: In case the session expires, Home Assistant will inform you and you can easily repeat the QR code login process.
+This integration now uses a standard OAuth 2.0 flow with PKCE to authenticate with Samsung servers. This mirrors the authentication used by official Samsung apps, providing a persistent session that automatically refreshes. You no longer need to worry about manually re-authenticating or sessions expiring unexpectedly.
 
 ## Notes on connection to the devices
 Being able to let a SmartTag ring depends on a phone/tablet nearby which forwards your request via Bluetooth. If your phone is not near your tag, you can't make it ring. The location should still update if any Galaxy device is nearby. 
@@ -57,10 +55,14 @@ By default active mode is enabled for SmartTags but disabled for any other devic
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=smartthings_find)
 
-1. Go to the Integrations page
-2. Search for "SmartThings *Find*" (**do not confuse with the built-in SmartThings integration!**)
-3. To login, scan the QR Code shown in the config flow or follow the shown link.
-4. Wait a few seconds, and the integration should be ready.
+1. Go to the Integrations page  
+2. Search for "SmartThings Find" (**do not confuse this with the built-in SmartThings integration!**)  
+3. Follow the on-screen configuration wizard:
+   - **Login**: Click the provided link to log in to your Samsung account.
+   - **Redirect**: After logging in, the browser will try to open a `ms-app://...` link. Cancel the external app prompt if it appears.
+   - **Copy URL**: Use Developer Tools (F12) and copy the full `ms-app://...` URL from Network or Console (not the visible error page URL).
+   - **Paste**: Paste the copied URL back into the Home Assistant dialog.
+4. The integration will verify the token and load your devices.
 
 ## Debugging
 
@@ -87,11 +89,14 @@ For support, please create an issue on the GitHub repository.
 
 ## Roadmap
 
-- ~~HACS support~~ ✅
-- Service to let a device ring
-- Service to make a device stop ringing (for devices that support this feature)
-- ~~Allow adding two instances of this integration (two Samsung Accounts)~~ ✅
+- No roadmap, unfortunately, I don't have time for adding features
 
 ## Disclaimer
 
 This is a third-party integration and is not affiliated with or endorsed by Samsung or SmartThings.
+
+## Credits
+
+- **[tomskra](https://github.com/tomskra)** and **[Vedeneb](https://github.com/Vedeneb)** for the original integration work.
+- **[PixelShober](https://github.com/PixelShober)** for the OAuth 2.0/PKCE login rework this fork merges in.
+- **[KieronQuinn](https://github.com/KieronQuinn)** for the [uTag](https://github.com/KieronQuinn/uTag) project and documenting the authentication protocol.

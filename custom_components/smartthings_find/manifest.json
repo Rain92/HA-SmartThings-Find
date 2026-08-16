@@ -1,14 +1,21 @@
 {
   "domain": "smartthings_find",
   "name": "SmartThings Find",
-  "after_dependencies": ["http"],
-  "version": "0.2.1",
+  "after_dependencies": [
+    "http"
+  ],
+  "version": "0.3",
   "documentation": "https://github.com/herisanuadrian/HA-SmartThings-Find",
   "issue_tracker": "https://github.com/herisanuadrian/HA-SmartThings-Find/issues",
   "integration_type": "hub",
   "dependencies": [],
-  "codeowners": ["@herisanuadrian"],
-  "requirements": ["requests", "qrcode"],
+  "codeowners": [
+    "@herisanuadrian"
+  ],
+  "requirements": [
+    "requests",
+    "cryptography"
+  ],
   "iot_class": "cloud_polling",
   "config_flow": true
 }
