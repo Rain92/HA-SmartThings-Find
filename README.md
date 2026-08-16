@@ -1,7 +1,6 @@
-# ⚠️ Repository archived! ⚠️
-Unfortunately, I no longer have the time to maintain this repository. I underestimated how much work it would be. Additionally, my focus recently has shifted away from HA (and programming in general) towards other things. I sincerely hope someone else can take over and build a solid, reliable integration from what's already here.
-
 # SmartThings Find Integration for Home Assistant
+
+This is a fork of [Vedeneb/HA-SmartThings-Find](https://github.com/Vedeneb/HA-SmartThings-Find), which was archived by its original author. This fork is actively maintained.
 
 This integration adds support for devices from Samsung SmartThings Find. While intended mainly for Samsung SmartTags, it also works with other devices, such as phones, tablets, watches and earbuds.
 
@@ -40,9 +39,9 @@ By default active mode is enabled for SmartTags but disabled for any other devic
 
 ### Using HACS
 
-1. Add this repository as a custom repository in HACS. Either by manually adding `https://github.com/Vedeneb/HA-SmartThings-Find` with category `integration` or simply click the following button:
+1. Add this repository as a custom repository in HACS. Either by manually adding `https://github.com/herisanuadrian/HA-SmartThings-Find` with category `integration` or simply click the following button:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Vedeneb&repository=HA-SmartThings-Find&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=herisanuadrian&repository=HA-SmartThings-Find&category=integration)
 
 2. Search for "SmartThings Find" in HACS and install the integration
 3. Restart Home Assistant
