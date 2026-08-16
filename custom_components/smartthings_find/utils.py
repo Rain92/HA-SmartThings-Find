@@ -48,6 +48,15 @@ def get_random_string(length):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
+def _mask_secret(value: str | None, keep: int = 4) -> str:
+    """Return a partially-masked version of a sensitive string, safe to log."""
+    if not value:
+        return "<empty>"
+    if len(value) <= keep:
+        return "*" * len(value)
+    return f"{value[:keep]}...({len(value)} chars)"
+
+
 def _html_unescape(value: str | None) -> str:
     if not isinstance(value, str):
         return ""
@@ -519,9 +528,9 @@ async def do_login_stage_one(hass: HomeAssistant) -> tuple:
     if _LOGGER.isEnabledFor(logging.DEBUG):
         _LOGGER.debug(
             "Auth debug: state=%s code_verifier=%s device_id=%s",
-            state,
-            code_verifier,
-            device_id
+            _mask_secret(state),
+            _mask_secret(code_verifier),
+            _mask_secret(device_id)
         )
 
     svc_param = {
@@ -635,9 +644,9 @@ async def do_login_stage_two(
         headers={'Content-Type': 'application/x-www-form-urlencoded'}
     ) as res:
         if res.status != 200:
-             return None, None, None, None, f"Token exchange failed: {await res.text()}"
+             return None, None, None, None, f"Token exchange failed: HTTP {res.status} - {_mask_secret(await res.text(), keep=40)}"
         data = await res.json()
-    
+
     user_auth_token = data.get('userauth_token') or data.get('userAuthToken')
     user_id = data.get('userId') or data.get('user_id')
     login_id = data.get('loginId') or data.get('login_id') or ret_value
@@ -669,7 +678,7 @@ async def do_login_stage_two(
             params=params_auth
         ) as res:
             if res.status != 200:
-                 return None, f"Authorize failed: {await res.text()}"
+                 return None, f"Authorize failed: HTTP {res.status} - {_mask_secret(await res.text(), keep=40)}"
             auth_data = await res.json()
 
         auth_code = auth_data.get('code')
@@ -680,7 +689,7 @@ async def do_login_stage_two(
                 params=params_auth
             ) as res:
                 if res.status != 200:
-                     return None, f"Authorize failed: {await res.text()}"
+                     return None, f"Authorize failed: HTTP {res.status} - {_mask_secret(await res.text(), keep=40)}"
                 auth_data = await res.json()
             auth_code = auth_data.get('code')
 
@@ -699,7 +708,7 @@ async def do_login_stage_two(
             headers={'Content-Type': 'application/x-www-form-urlencoded'}
         ) as res:
             if res.status != 200:
-                 return None, f"Token exchange failed: {await res.text()}"
+                 return None, f"Token exchange failed: HTTP {res.status} - {_mask_secret(await res.text(), keep=40)}"
             token_data = await res.json()
 
         return token_data, None
@@ -744,7 +753,11 @@ async def _refresh_token(
 
         async with session.post(url, data=payload, headers=headers) as res:
             if res.status != 200:
-                _LOGGER.error(f"Token refresh failed: {res.status} - {await res.text()}")
+                _LOGGER.error(
+                    "Token refresh failed: %s - %s",
+                    res.status,
+                    _mask_secret(await res.text(), keep=40)
+                )
                 raise ConfigEntryAuthFailed("Token refresh failed")
 
             data = await res.json()
