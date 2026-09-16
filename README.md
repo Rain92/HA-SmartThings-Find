@@ -82,6 +82,12 @@ tags (`raw_device`), which is the only way to tell what a given account actually
 API is undocumented and differs between tag generations and regions. Access tokens, account
 identifiers and coordinates are redacted. This is the right thing to attach to a bug report.
 
+It also includes `tracker_endpoint_probe`: a read-only GET against each per-tag endpoint of the
+SmartThings "chaser" API (`metadata`, `searchingstatus`, `button/options`, `timer`, `category`,
+`firmware`), recovered from the SmartThings app. The integration does not use these during normal
+operation - they are probed only when you download diagnostics, and only with GET, so nothing on
+the tag is changed. This is how to find out which per-tag settings your account actually exposes.
+
 ## Notes on connection to the devices
 Being able to let a SmartTag ring depends on a phone/tablet nearby which forwards your request via Bluetooth. If your phone is not near your tag, you can't make it ring. The location should still update if any Galaxy device is nearby. 
 

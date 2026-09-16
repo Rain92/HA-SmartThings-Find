@@ -100,7 +100,12 @@ All logic lives in `custom_components/smartthings_find/`:
 - **`diagnostics.py`** — `async_get_config_entry_diagnostics` dumps the config entry, the built
   device list (including each tag's untouched `raw_device` payload) and the coordinator data, with
   tokens, account identifiers and coordinates redacted via `TO_REDACT`. This is the fastest way to
-  see what a given account's API actually returns.
+  see what a given account's API actually returns. It also runs `probe_tracker_endpoints()`
+  (`utils.py`), a read-only GET sweep of the SmartThings "chaser" per-tag endpoints
+  (`CHASER_BASE_URL` = `https://client.smartthings.com/chaser`, paths in `TRACKER_PROBE_PATHS`,
+  recovered from the SmartThings APK). Chaser takes the same IoT bearer token as the installed-app
+  API. The sweep is GET-only and never raises - a failing probe records its error and the rest
+  continue. Nothing else in the integration calls chaser.
 
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,
   `CLIENT_ID_ONECONNECT`, `SCOPE_FIND`, `SCOPE_AUTH`), defaults (e.g.

@@ -10,6 +10,7 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN,
@@ -24,6 +25,7 @@ from .const import (
     CONF_ST_USER_UUID,
     CONF_INSTALLED_APP_ID,
 )
+from .utils import probe_tracker_endpoints
 
 TO_REDACT = {
     # Credentials and account identity
@@ -62,6 +64,23 @@ async def async_get_config_entry_diagnostics(
     devices = store.get("devices") or []
     coordinator = store.get("coordinator")
 
+    # Read-only probe of the chaser tracker endpoints, to see which per-tag settings
+    # this account exposes. Only runs when diagnostics are downloaded, never during
+    # normal polling, and only issues GETs.
+    session = async_get_clientsession(hass)
+    probes: dict[str, Any] = {}
+    for device in devices:
+        data = device.get("data") or {}
+        if not data.get("is_tracker"):
+            continue
+        device_id = data.get("st_device_id") or data.get("device_id")
+        if not device_id:
+            continue
+        probes[data.get("name") or device_id] = async_redact_data(
+            await probe_tracker_endpoints(hass, session, entry.entry_id, device_id),
+            TO_REDACT,
+        )
+
     return {
         "entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
@@ -77,4 +96,5 @@ async def async_get_config_entry_diagnostics(
         "coordinator_data": async_redact_data(
             dict(coordinator.data or {}) if coordinator else {}, TO_REDACT
         ),
+        "tracker_endpoint_probe": probes,
     }

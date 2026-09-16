@@ -280,6 +280,68 @@ async def _smartthings_get_json(
         return res.status, await res.json()
 
 
+# Base URL of the "chaser" tracker API, the surface the SmartThings app uses for
+# per-tag settings. It takes the same IoT bearer token as the installed-app API.
+CHASER_BASE_URL = "https://client.smartthings.com/chaser"
+
+# Read-only endpoints, recovered from the SmartThings APK's string table. Probed for
+# diagnostics only, to find out what settings an account actually exposes for a tag -
+# the integration does not use them during normal operation. GET only, on purpose: none
+# of these change anything on the tag.
+TRACKER_PROBE_PATHS = (
+    "/trackers/{device_id}/metadata",
+    "/trackers/{device_id}/searchingstatus",
+    "/trackers/{device_id}/button/options",
+    "/trackers/{device_id}/timer",
+    "/trackers/{device_id}/category",
+    "/trackers/{device_id}/firmware",
+    "/trackers/categories",
+)
+
+
+async def probe_tracker_endpoints(
+    hass: HomeAssistant,
+    session: aiohttp.ClientSession,
+    entry_id: str,
+    device_id: str
+) -> dict:
+    """GET each known chaser tracker endpoint and report what comes back.
+
+    Purely diagnostic. Never raises - a failing probe records its error and the rest
+    continue, so downloading diagnostics can't break because Samsung changed a path.
+    """
+    results: dict[str, dict] = {}
+    if not device_id:
+        return results
+
+    refreshed = False
+    for template in TRACKER_PROBE_PATHS:
+        path = template.format(device_id=device_id)
+        url = f"{CHASER_BASE_URL}{path}"
+        try:
+            for attempt in range(2):
+                headers = _get_smartthings_headers(hass, entry_id)
+                async with session.get(
+                    url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)
+                ) as res:
+                    status = res.status
+                    text = await res.text()
+                if status in (401, 403) and not refreshed and attempt == 0:
+                    await refresh_iot_token(hass, session, entry_id)
+                    refreshed = True
+                    continue
+                break
+            entry: dict = {"status": status}
+            try:
+                entry["body"] = json.loads(text)
+            except ValueError:
+                entry["body"] = text[:2000]
+            results[path] = entry
+        except Exception as exc:
+            results[path] = {"error": f"{type(exc).__name__}: {exc}"}
+    return results
+
+
 async def _ensure_smartthings_user_info(
     hass: HomeAssistant,
     session: aiohttp.ClientSession,
