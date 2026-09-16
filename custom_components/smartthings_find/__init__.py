@@ -27,11 +27,21 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_UPDATE_INTERVAL_DEFAULT,
 )
-from .utils import get_devices, get_device_location, update_device_maps_link
+from .utils import (
+    get_devices,
+    get_device_location,
+    update_device_maps_link,
+    get_device_ble_metadata,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [Platform.DEVICE_TRACKER, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [
+    Platform.DEVICE_TRACKER,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.BINARY_SENSOR,
+]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the SmartThings Find component."""
@@ -155,6 +165,15 @@ class SmartThingsFindCoordinator(DataUpdateCoordinator):
                 if tag_data.get('location_found'):
                     update_device_maps_link(
                         self.hass, dev_data['device_id'], tag_data.get('used_loc'))
+                # Per-tag settings live in the SmartThings device API rather than the
+                # Find API, so they need their own call.
+                if dev_data.get('is_tracker'):
+                    tag_data['ble_metadata'] = await get_device_ble_metadata(
+                        self.hass,
+                        self.session,
+                        self.entry_id,
+                        dev_data.get('st_device_id') or dev_data['device_id'],
+                    )
             _LOGGER.debug(f"Fetched {len(tags)} locations")
             return tags
         except ConfigEntryAuthFailed as err:

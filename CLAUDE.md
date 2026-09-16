@@ -110,6 +110,13 @@ All logic lives in `custom_components/smartthings_find/`:
   endpoints (`/trackers/categories`, `/utsconfig`) are readable, every per-tag endpoint is 403 or
   405, and no power-saving setting is reachable. Do not re-run this investigation from scratch.
 
+- **`binary_sensor.py`** — `DevicePowerSavingSensor`, the tag's power saving mode
+  ("Energiesparmodus"), read from `bleD2D.metadata.activeMode.mode` via
+  `get_device_ble_metadata()` / `get_power_saving_state()` in `utils.py`. It is a binary_sensor
+  and not a switch because only the read path is confirmed; see "Notes on power saving mode" in
+  the README for what was ruled out and why. The coordinator fetches the metadata blob per
+  tracker on each poll and stores it under `ble_metadata`.
+
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,
   `CLIENT_ID_ONECONNECT`, `SCOPE_FIND`, `SCOPE_AUTH`), defaults (e.g.
   `CONF_UPDATE_INTERVAL_DEFAULT = 120`, `RING_TIMEOUT_SECONDS = 120`), and the `BATTERY_LEVELS`

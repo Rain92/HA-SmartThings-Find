@@ -121,6 +121,7 @@ def _sync_entity_names(hass: HomeAssistant, device_id: str, name: str) -> None:
         ("sensor", f"stf_device_battery_{device_id}", f"{name} Battery"),
         ("sensor", f"stf_device_location_{device_id}", f"{name} Location"),
         ("sensor", f"stf_device_maps_link_{device_id}", f"{name} Maps Link"),
+        ("binary_sensor", f"stf_power_saving_{device_id}", f"{name} Power Saving"),
         ("switch", f"stf_ring_switch_{device_id}", f"{name} Ring"),
         ("button", f"stf_ring_button_{device_id}", f"{name} Ring"),
         ("button", f"stf_ring_stop_button_{device_id}", f"{name} Stop Ring"),
@@ -390,6 +391,75 @@ async def probe_tracker_endpoints(
         except Exception as exc:
             results[path] = {"error": f"{type(exc).__name__}: {exc}"}
     return results
+
+
+async def get_device_ble_metadata(
+    hass: HomeAssistant,
+    session: aiohttp.ClientSession,
+    entry_id: str,
+    device_id: str
+) -> dict | None:
+    """Return the tag's bleD2D.metadata blob from the public SmartThings device API.
+
+    This is where the per-tag settings actually live. Confirmed by A/B test against a
+    SmartTag2: toggling "Energiesparmodus" in the SmartThings app flips
+    `activeMode.mode` between 1 (power saving on) and 0 (off), and nothing else in the
+    whole payload changes. The blob also carries battery.level, firmware.version,
+    searchingStatus, e2eEncryption, remoteRing and lastKnownConnection.
+
+    Note the SmartThings *capability* values (tag.uwbActivation and friends) are all
+    null for this tag and did not move when the setting was toggled, so they are not a
+    usable source for this.
+    """
+    if not device_id:
+        return None
+    url = f"{SMARTTHINGS_API_BASE}/devices/{device_id}"
+    try:
+        headers = _get_smartthings_headers(hass, entry_id)
+        async with session.get(
+            url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)
+        ) as res:
+            if res.status in (401, 403):
+                await refresh_iot_token(hass, session, entry_id)
+                headers = _get_smartthings_headers(hass, entry_id)
+                async with session.get(
+                    url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)
+                ) as retry:
+                    if retry.status != 200:
+                        _LOGGER.debug(
+                            "BLE metadata fetch failed after refresh [%s]", retry.status
+                        )
+                        return None
+                    body = await retry.json()
+            elif res.status != 200:
+                _LOGGER.debug("BLE metadata fetch failed [%s]", res.status)
+                return None
+            else:
+                body = await res.json()
+    except Exception as exc:
+        _LOGGER.debug("BLE metadata fetch error: %s", exc)
+        return None
+
+    ble = (body or {}).get("bleD2D") or {}
+    metadata = ble.get("metadata")
+    return metadata if isinstance(metadata, dict) else None
+
+
+def get_power_saving_state(metadata: dict | None) -> bool | None:
+    """True when the tag's power saving mode ("Energiesparmodus") is on.
+
+    `activeMode.mode` names which mode is active: 0 = normal, 1 = power saving.
+    Returns None when the field is absent, so callers can tell "off" from "unknown".
+    """
+    if not isinstance(metadata, dict):
+        return None
+    mode = (metadata.get("activeMode") or {}).get("mode")
+    if mode is None:
+        return None
+    try:
+        return int(mode) == 1
+    except (TypeError, ValueError):
+        return None
 
 
 # Public SmartThings API. A tag's settings screen renders its capability list (that is

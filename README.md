@@ -12,6 +12,9 @@ Currently the integration creates these entities (trackers only):
 * `sensor`: `<name> Maps Link` - the Google Maps URL as its own entity, listed under
   **Diagnostic** on the device page.
 * `switch`: Optimistic ring toggle (auto turns off after 120s).
+* `binary_sensor`: `<name> Power Saving` - the tag's power saving mode
+  ("Energiesparmodus"), read-only. Carries firmware version, model, battery level,
+  searching status, E2E encryption, remote ring and connection state as attributes.
 
 This integration does **not** allow you to perform actions based on button presses on the SmartTag! There are other ways to do that.
 
@@ -68,6 +71,19 @@ type: markdown
 content: >-
   [Open in Google Maps]({{ state_attr('sensor.schlussel_location', 'google_maps_url') }})
 ```
+
+## Notes on power saving mode
+
+The tag's power saving mode is exposed read-only, as a `binary_sensor`. It is read from
+`bleD2D.metadata.activeMode.mode` on the SmartThings device API (`0` = normal, `1` = power
+saving), which was confirmed by toggling the setting in the SmartThings app and diffing the
+payload: that single field flips and nothing else does.
+
+Writing it is not supported. The SmartThings app sets it through its own tracker-metadata
+update, whose request body is not reproducible from the public API - `/chaser/trackers/{id}/metadata`
+returns 403 for our token. The SmartThings *capability* values (`tag.uwbActivation` and the
+other `tag.*` ones) are all `null` for this tag and do not move when the setting is toggled,
+so they are not usable either.
 
 ## Renaming
 
