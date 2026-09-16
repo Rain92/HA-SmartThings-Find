@@ -2,23 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-@.claude-private/CLAUDE.md
-
 ## Repository status
 
-This is a fork of `Vedeneb/HA-SmartThings-Find` (archived by its original author) and is actively
-maintained here. `origin` points at this fork (`herisanuadrian/HA-SmartThings-Find`); `upstream`
-still points at the original Vedeneb repo for reference; `pixelshober` points at
-`PixelShober/HA-SmartThings-Find`, whose OAuth2/PKCE login rework was merged in to replace the old
-JSESSIONID web-login scraping after Samsung redesigned their account login page and broke it. There
-is no CI beyond HACS structural validation — no test suite, linter, or build step exists in this repo.
+This repo is the fork `Rain92/HA-SmartThings-Find` (`origin`). Its ancestry is
+`Vedeneb/HA-SmartThings-Find` (the original, archived by its author) → `herisanuadrian/HA-SmartThings-Find`
+→ here. Extra remotes for reference: `upstream` → Vedeneb, `herisanuadrian` → the intermediate fork,
+`pixelshober` → `PixelShober/HA-SmartThings-Find`, whose OAuth2/PKCE login rework was merged in to
+replace the old JSESSIONID web-login scraping after Samsung redesigned their account login page and
+broke it. There is no CI beyond HACS structural validation — no test suite, linter, or build step
+exists in this repo.
 
 ## What this is
 
 A Home Assistant custom integration (`custom_components/smartthings_find`) that adds Samsung
 SmartThings Find support (SmartTags, phones, tablets, watches, earbuds) to Home Assistant via
-`device_tracker`, `sensor` (battery), `button` (ring/stop-ring), and `switch` (optimistic ring toggle)
-entities. It works by reverse-engineered calls to Samsung's undocumented SmartThings Find / SmartThings
+`device_tracker`, `sensor` (battery), and `switch` (optimistic ring toggle) entities. It works by reverse-engineered calls to Samsung's undocumented SmartThings Find / SmartThings
 Cloud APIs — there is no official public API, so behavior is fragile and can break whenever Samsung
 changes their backend.
 
@@ -82,8 +80,8 @@ All logic lives in `custom_components/smartthings_find/`:
   device on `update_interval` seconds. Devices disabled in the HA device registry are skipped when
   building the device list.
 
-- **`device_tracker.py`**, **`sensor.py`**, **`button.py`**, **`switch.py`** — thin entity platforms
-  reading from the shared coordinator's data and, for `button.py`/`switch.py`, triggering
+- **`device_tracker.py`**, **`sensor.py`**, **`switch.py`** — thin entity platforms
+  reading from the shared coordinator's data and, for `switch.py`, triggering
   ring/stop-ring requests through `utils.py`. The `switch.py` ring toggle is optimistic (auto-turns
   off after `RING_TIMEOUT_SECONDS`) because the OAuth API doesn't expose actual ring status.
 

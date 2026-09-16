@@ -5,12 +5,12 @@
     "http"
   ],
   "version": "0.3",
-  "documentation": "https://github.com/herisanuadrian/HA-SmartThings-Find",
-  "issue_tracker": "https://github.com/herisanuadrian/HA-SmartThings-Find/issues",
+  "documentation": "https://github.com/Rain92/HA-SmartThings-Find",
+  "issue_tracker": "https://github.com/Rain92/HA-SmartThings-Find/issues",
   "integration_type": "hub",
   "dependencies": [],
   "codeowners": [
-    "@herisanuadrian"
+    "@Rain92"
   ],
   "requirements": [
     "requests",

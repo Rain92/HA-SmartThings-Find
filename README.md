@@ -1,6 +1,6 @@
 # SmartThings Find Integration for Home Assistant
 
-This is a fork of [Vedeneb/HA-SmartThings-Find](https://github.com/Vedeneb/HA-SmartThings-Find) (archived by its original author), merging in the OAuth 2.0/PKCE login rework from [PixelShober/HA-SmartThings-Find](https://github.com/PixelShober/HA-SmartThings-Find), which replaced the unstable JSESSIONID web-login scraping (broken by a Samsung account login redesign) with the OAuth flow used by official Samsung apps. This fork is actively maintained.
+This repository is maintained at [Rain92/HA-SmartThings-Find](https://github.com/Rain92/HA-SmartThings-Find). It continues the fork chain [Vedeneb/HA-SmartThings-Find](https://github.com/Vedeneb/HA-SmartThings-Find) (the original, archived by its author) → [herisanuadrian/HA-SmartThings-Find](https://github.com/herisanuadrian/HA-SmartThings-Find), and includes the OAuth 2.0/PKCE login rework from [PixelShober/HA-SmartThings-Find](https://github.com/PixelShober/HA-SmartThings-Find), which replaced the JSESSIONID web-login scraping that Samsung's account login redesign broke.
 
 This integration adds support for devices from Samsung SmartThings Find. While intended mainly for Samsung SmartTags, it also works with other devices, such as phones, tablets, watches and earbuds.
 
@@ -37,9 +37,9 @@ By default active mode is enabled for SmartTags but disabled for any other devic
 
 ### Using HACS
 
-1. Add this repository as a custom repository in HACS. Either by manually adding `https://github.com/herisanuadrian/HA-SmartThings-Find` with category `integration` or simply click the following button:
+1. Add this repository as a custom repository in HACS. Either by manually adding `https://github.com/Rain92/HA-SmartThings-Find` with category `integration` or simply click the following button:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=herisanuadrian&repository=HA-SmartThings-Find&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Rain92&repository=HA-SmartThings-Find&category=integration)
 
 2. Search for "SmartThings Find" in HACS and install the integration
 3. Restart Home Assistant
@@ -87,10 +87,6 @@ Contributions are welcome! Feel free to open issues or submit pull requests to h
 
 For support, please create an issue on the GitHub repository.
 
-## Roadmap
-
-- No roadmap, unfortunately, I don't have time for adding features
-
 ## Disclaimer
 
 This is a third-party integration and is not affiliated with or endorsed by Samsung or SmartThings.
@@ -98,5 +94,6 @@ This is a third-party integration and is not affiliated with or endorsed by Sams
 ## Credits
 
 - **[tomskra](https://github.com/tomskra)** and **[Vedeneb](https://github.com/Vedeneb)** for the original integration work.
+- **[herisanuadrian](https://github.com/herisanuadrian)** for keeping the fork alive after the original was archived.
 - **[PixelShober](https://github.com/PixelShober)** for the OAuth 2.0/PKCE login rework this fork merges in.
 - **[KieronQuinn](https://github.com/KieronQuinn)** for the [uTag](https://github.com/KieronQuinn/uTag) project and documenting the authentication protocol.
