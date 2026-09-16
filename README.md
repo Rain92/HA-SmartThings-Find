@@ -37,14 +37,34 @@ on the device's page (Settings -> Devices & services -> Devices -> pick the devi
 once a location has been received at least once. (This replaces the link to the SmartThings Find
 website for tracker devices; other device types keep it.)
 
-Attributes themselves are not clickable, so to get a link on a dashboard as well, use a Markdown
-card:
+Attributes themselves are not clickable, so for a link at the top level of a dashboard, add a
+Markdown card. This one lists every tag with a known position and needs no entity IDs - it picks up
+new tags automatically and skips the ones that have not reported a location yet:
+
+```yaml
+type: markdown
+title: SmartThings Find
+content: |-
+  {% for s in states.sensor
+       | selectattr('attributes.google_maps_url', 'defined')
+       | selectattr('attributes.google_maps_url', 'string')
+       | sort(attribute='name') %}
+  **[{{ s.name | replace(' Location', '') }}]({{ s.attributes.google_maps_url }})**
+  {{ s.state }}{% if s.attributes.last_seen %} · seen {{ relative_time(s.attributes.last_seen) }} ago{% endif %}
+  {% endfor %}
+```
+
+Renders as a clickable list:
+
+> **[Schlüssel](#)**
+> 52.520008, 13.404954 · seen 7 minutes ago
+
+For a single tag, the short form is:
 
 ```yaml
 type: markdown
 content: >-
-  [Open {{ state_attr('sensor.smarttag_location', 'friendly_name') }} in Google
-  Maps]({{ state_attr('sensor.smarttag_location', 'google_maps_url') }})
+  [Open in Google Maps]({{ state_attr('sensor.schlussel_location', 'google_maps_url') }})
 ```
 
 ## Notes on connection to the devices
