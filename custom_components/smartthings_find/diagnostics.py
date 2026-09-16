@@ -25,7 +25,7 @@ from .const import (
     CONF_ST_USER_UUID,
     CONF_INSTALLED_APP_ID,
 )
-from .utils import probe_tracker_endpoints
+from .utils import probe_tracker_endpoints, probe_device_detail_endpoints
 
 TO_REDACT = {
     # Credentials and account identity
@@ -77,7 +77,12 @@ async def async_get_config_entry_diagnostics(
         if not device_id:
             continue
         probes[data.get("name") or device_id] = async_redact_data(
-            await probe_tracker_endpoints(hass, session, entry.entry_id, device_id),
+            {
+                **await probe_tracker_endpoints(hass, session, entry.entry_id, device_id),
+                **await probe_device_detail_endpoints(
+                    hass, session, entry.entry_id, device_id
+                ),
+            },
             TO_REDACT,
         )
 

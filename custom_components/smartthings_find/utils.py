@@ -392,6 +392,64 @@ async def probe_tracker_endpoints(
     return results
 
 
+# Public SmartThings API. A tag's settings screen renders its capability list (that is
+# why "Battery" shows up there), and capability values are readable from here.
+SMARTTHINGS_API_BASE = "https://api.smartthings.com/v1"
+
+
+async def probe_device_detail_endpoints(
+    hass: HomeAssistant,
+    session: aiohttp.ClientSession,
+    entry_id: str,
+    device_id: str
+) -> dict:
+    """Read-only probe of the device detail / capability endpoints.
+
+    Two surfaces: the installed-app '/devices/{id}/details' and '/main' routes found in
+    the SmartThings APK, and the public capability API. GET only; nothing here changes
+    anything on the tag.
+    """
+    results: dict[str, dict] = {}
+    if not device_id:
+        return results
+
+    # Installed-app routes. The uri/extraUri split is not documented, so try the whole
+    # path as uri and the split form, and report whichever answers.
+    attempts = (
+        (f"/devices/{device_id}/details", None),
+        ("/devices", f"/{device_id}/details"),
+        (f"/devices/{device_id}/main", None),
+        ("/devices", f"/{device_id}/main"),
+    )
+    for uri, extra_uri in attempts:
+        # Both forms resolve to the same path, so key them by the split as well or one
+        # result silently overwrites the other.
+        label = f"installedapp GET uri={uri} extraUri={extra_uri}"
+        try:
+            status, response = await _execute_installed_app(
+                hass, session, entry_id, "GET", uri, extra_uri=extra_uri
+            )
+            app_status, message, error_code = _parse_installed_apps_response(response)
+            results[label] = {
+                "http_status": status,
+                "app_status": app_status,
+                "error_code": error_code,
+                "body": message if message is not None else str(response)[:2000],
+            }
+        except Exception as exc:
+            results[label] = {"error": f"{type(exc).__name__}: {exc}"}
+
+    # Public capability API.
+    for suffix in ("", "/status", "/components/main/status"):
+        url = f"{SMARTTHINGS_API_BASE}/devices/{device_id}{suffix}"
+        label = f"api.smartthings.com GET /v1/devices/{{id}}{suffix}"
+        try:
+            results[label] = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
+        except Exception as exc:
+            results[label] = {"error": f"{type(exc).__name__}: {exc}"}
+    return results
+
+
 async def _ensure_smartthings_user_info(
     hass: HomeAssistant,
     session: aiohttp.ClientSession,
