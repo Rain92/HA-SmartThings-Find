@@ -288,6 +288,24 @@ CHASER_BASE_URL = "https://client.smartthings.com/chaser"
 # diagnostics only, to find out what settings an account actually exposes for a tag -
 # the integration does not use them during normal operation. GET only, on purpose: none
 # of these change anything on the tag.
+#
+# Observed against a SmartTag2 (UWB_TAG), SmartThings app 1.8.47.24, with our IoT token:
+#   /trackers/categories          200  global category list, localised
+#   /utsconfig                    200  {scanDuration, numOfScanTimes, rssiFilter, brand}
+#   /trackers/{id}/metadata       403  empty body, with Accept v1 AND v6 - a real
+#                                      permission boundary, not a version mismatch
+#   /trackers/{id}/searchingstatus,
+#   /button/options, /timer,
+#   /category, /firmware          405  resource exists, GET not allowed. Samsung's
+#                                      gateway sends no Allow header, so the accepted
+#                                      verb cannot be discovered without sending one
+#   /trackers/{id}/pprecords,
+#   /lostmessage                  404
+#
+# Conclusion: no per-tag power-saving ("Energiesparmodus") setting is reachable from any
+# endpoint we can read. The SmartTag settings UI is a runtime-downloaded SmartThings
+# plugin, so its request payloads are not in the APK either. Settling it needs a capture
+# of the app's own traffic.
 TRACKER_PROBE_PATHS = (
     "/trackers/{device_id}/metadata",
     "/trackers/{device_id}/searchingstatus",

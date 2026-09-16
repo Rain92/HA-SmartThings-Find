@@ -105,7 +105,10 @@ All logic lives in `custom_components/smartthings_find/`:
   (`CHASER_BASE_URL` = `https://client.smartthings.com/chaser`, paths in `TRACKER_PROBE_PATHS`,
   recovered from the SmartThings APK). Chaser takes the same IoT bearer token as the installed-app
   API. The sweep is GET-only and never raises - a failing probe records its error and the rest
-  continue. Nothing else in the integration calls chaser.
+  continue. Nothing else in the integration calls chaser. The observed results per endpoint are
+  recorded in a comment above `TRACKER_PROBE_PATHS`; the short version is that only the two global
+  endpoints (`/trackers/categories`, `/utsconfig`) are readable, every per-tag endpoint is 403 or
+  405, and no power-saving setting is reachable. Do not re-run this investigation from scratch.
 
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,
   `CLIENT_ID_ONECONNECT`, `SCOPE_FIND`, `SCOPE_AUTH`), defaults (e.g.
