@@ -18,7 +18,7 @@
     },
     "error": {
       "login_error": "Initialisierung fehlgeschlagen: {error_msg}",
-      "auth_failed": "Authentifizierung fehlgeschlagen. Bitte \u00fcberpr\u00fcfen Sie die URL und versuchen Sie es erneut."
+      "auth_failed": "Authentifizierung fehlgeschlagen: {error_msg}"
     },
     "progress": {
       "task_stage_one": "Vorbereitung l\u00e4uft, bitte warten...",

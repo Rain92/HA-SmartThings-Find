@@ -69,6 +69,31 @@ def _html_unescape(value: str | None) -> str:
     return current
 
 
+def parse_redirect_url(redirect_url: str) -> dict[str, str]:
+    """Extract the query parameters from the ms-app:// URL the user pastes in.
+
+    The URL is copied by hand out of the browser, so it arrives in whatever shape
+    devtools rendered it. In particular the Network/Console panes hand out an
+    HTML-escaped URL (`&amp;` instead of `&`), which would otherwise turn every
+    parameter after the first into a bogus `amp;<name>` key and leave us with only
+    `code`. Surrounding whitespace/quotes and a missing scheme are tolerated too.
+    """
+    url = _html_unescape((redirect_url or "").strip().strip('"').strip("'"))
+    parsed = urllib.parse.urlparse(url)
+    query = parsed.query
+    if not query and parsed.fragment:
+        query = parsed.fragment
+    if not query and "?" in url:
+        # No recognisable scheme, e.g. the user pasted only "host?code=..."
+        query = url.split("?", 1)[1]
+    params = {k: v[0] for k, v in urllib.parse.parse_qs(query).items() if v}
+    if parsed.fragment and parsed.query:
+        params.update(
+            {k: v[0] for k, v in urllib.parse.parse_qs(parsed.fragment).items() if v}
+        )
+    return params
+
+
 def format_ring_error(err: str | None) -> str:
     if not err:
         return "Ring failed"
@@ -602,33 +627,67 @@ async def do_login_stage_two(
     device_id = auth_data.get("device_id") or _get_or_create_device_id(hass)
 
     # Parse parameters from redirect URL
-    import urllib.parse
-    parsed = urllib.parse.urlparse(redirect_url)
-    params = urllib.parse.parse_qs(parsed.query)
-    if parsed.fragment:
-        params.update(urllib.parse.parse_qs(parsed.fragment))
-    
-    # Parameters needed: code, auth_server_url
-    auth_server_url = params.get('auth_server_url', [''])[0]
-    code = params.get('code', [''])[0]
-    state_param = params.get('state', [''])[0]
-    ret_value = params.get('retValue', [''])[0]
-    
-    if state_param:
-        decrypted_state = _decrypt_auth_value(state_param, state_orig)
-        if decrypted_state:
-            auth_server_url = _decrypt_auth_value(auth_server_url, decrypted_state) or auth_server_url
-            code = _decrypt_auth_value(code, decrypted_state) or code
-            ret_value = _decrypt_auth_value(ret_value, decrypted_state) or ret_value
+    params = parse_redirect_url(redirect_url)
+    _LOGGER.debug("Redirect URL parameters found: %s", sorted(params))
 
-    if auth_server_url and not auth_server_url.startswith("http"):
+    # Parameters needed: code, auth_server_url, state, retValue (the login id)
+    auth_server_url = params.get('auth_server_url', '')
+    code = params.get('code', '')
+    state_param = params.get('state', '')
+    ret_value = params.get('retValue', '')
+
+    missing = [
+        name for name, value in (
+            ("code", code),
+            ("state", state_param),
+            ("auth_server_url", auth_server_url),
+            ("retValue", ret_value),
+        ) if not value
+    ]
+    if missing:
+        return None, None, None, None, (
+            f"Redirect URL is missing these parameters: {', '.join(missing)}. "
+            "Copy the complete ms-app:// URL (everything up to the end of the line) "
+            "from the Network/Console tab and paste it unmodified."
+        )
+
+    # Samsung encrypts the response parameters (responseEncryptionYNFlag=Y): `state`
+    # is AES-encrypted with the state we sent in stage one, and its plaintext is the
+    # key for the remaining values.
+    if state_param != state_orig:
+        decrypted_state = _decrypt_auth_value(state_param, state_orig)
+        if not decrypted_state:
+            return None, None, None, None, (
+                "Could not decrypt the redirect URL. It belongs to a different login "
+                "attempt than the one this dialog started - open the login link shown "
+                "above again and paste the URL from that login."
+            )
+        decrypted = {}
+        for name, value in (
+            ("auth_server_url", auth_server_url),
+            ("code", code),
+            ("retValue", ret_value),
+        ):
+            plain = _decrypt_auth_value(value, decrypted_state)
+            if not plain:
+                return None, None, None, None, (
+                    f"Could not decrypt '{name}' from the redirect URL. "
+                    "Please restart the login and paste the URL unmodified."
+                )
+            decrypted[name] = plain
+        auth_server_url = decrypted["auth_server_url"]
+        code = decrypted["code"]
+        ret_value = decrypted["retValue"]
+
+    if not auth_server_url.startswith("http"):
         auth_server_url = f"https://{auth_server_url}"
 
-    if not auth_server_url or not code:
-        return None, None, None, None, "Missing auth_server_url or code in redirect URL"
-
-    if not ret_value:
-        return None, None, None, None, "Missing username in redirect URL"
+    _LOGGER.debug(
+        "Stage two: auth_server_url=%s code=%s username=%s",
+        auth_server_url,
+        _mask_secret(code),
+        _mask_secret(ret_value)
+    )
     
     async with session.post(
         f"{auth_server_url}/auth/oauth2/authenticate",

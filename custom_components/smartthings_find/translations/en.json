@@ -18,7 +18,7 @@
     },
     "error": {
       "login_error": "Initialization failed: {error_msg}",
-      "auth_failed": "Authentication failed. Please check the URL and try again."
+      "auth_failed": "Authentication failed: {error_msg}"
     },
     "progress": {
       "task_stage_one": "Preparing, please wait...",

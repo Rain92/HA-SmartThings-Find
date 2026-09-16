@@ -71,6 +71,7 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_auth_code(self, user_input=None, login_url=None):
         """Step where user enters the redirect URL."""
         errors = {}
+        error_msg = ""
         if user_input is not None:
             redirect_url_input = user_input.get("redirect_url")
             
@@ -83,8 +84,8 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             if not token_data_find or not token_data_iot:
                 errors["base"] = "auth_failed"
-                if err:
-                    _LOGGER.error("Auth failed: %s", err)
+                error_msg = err or "Unknown error"
+                _LOGGER.error("Auth failed: %s", error_msg)
                 # We might want to restart flow or let user try again
             else:
                 device_id = (
@@ -122,7 +123,8 @@ class SmartThingsFindConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required("redirect_url"): str
             }),
             description_placeholders={
-                "login_url": self.login_url
+                "login_url": getattr(self, "login_url", ""),
+                "error_msg": error_msg
             },
             errors=errors
         )
