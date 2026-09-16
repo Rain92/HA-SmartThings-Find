@@ -295,8 +295,43 @@ TRACKER_PROBE_PATHS = (
     "/trackers/{device_id}/timer",
     "/trackers/{device_id}/category",
     "/trackers/{device_id}/firmware",
+    "/trackers/{device_id}/pprecords",
+    "/trackers/{device_id}/lostmessage",
     "/trackers/categories",
+    "/utsconfig",
 )
+
+# Some SmartThings endpoints reject the default v1 Accept and need v6.
+ACCEPT_V1 = "application/vnd.smartthings+json;v=1"
+ACCEPT_V6 = "application/vnd.smartthings+json;v=6"
+
+
+async def _probe_get(
+    hass: HomeAssistant,
+    session: aiohttp.ClientSession,
+    entry_id: str,
+    url: str,
+    accept: str
+) -> dict:
+    """Single GET for the diagnostics probe. Records status, Allow header and body."""
+    headers = _get_smartthings_headers(hass, entry_id)
+    headers["Accept"] = accept
+    async with session.get(
+        url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)
+    ) as res:
+        status = res.status
+        # A 405 names the resource but not the verb; the Allow header is what tells us
+        # which method the endpoint actually wants.
+        allow = res.headers.get("Allow") or res.headers.get("allow")
+        text = await res.text()
+    result: dict = {"status": status}
+    if allow:
+        result["allow"] = allow
+    try:
+        result["body"] = json.loads(text)
+    except ValueError:
+        result["body"] = text[:2000]
+    return result
 
 
 async def probe_tracker_endpoints(
@@ -319,23 +354,20 @@ async def probe_tracker_endpoints(
         path = template.format(device_id=device_id)
         url = f"{CHASER_BASE_URL}{path}"
         try:
-            for attempt in range(2):
-                headers = _get_smartthings_headers(hass, entry_id)
-                async with session.get(
-                    url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)
-                ) as res:
-                    status = res.status
-                    text = await res.text()
-                if status in (401, 403) and not refreshed and attempt == 0:
-                    await refresh_iot_token(hass, session, entry_id)
-                    refreshed = True
-                    continue
-                break
-            entry: dict = {"status": status}
-            try:
-                entry["body"] = json.loads(text)
-            except ValueError:
-                entry["body"] = text[:2000]
+            entry = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
+            if entry["status"] in (401, 403) and not refreshed:
+                await refresh_iot_token(hass, session, entry_id)
+                refreshed = True
+                entry = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
+            # A 403 here may just be the wrong Accept version rather than a real
+            # permission problem, so note what v6 says too.
+            if entry["status"] == 403:
+                try:
+                    entry["retry_accept_v6"] = await _probe_get(
+                        hass, session, entry_id, url, ACCEPT_V6
+                    )
+                except Exception as exc:
+                    entry["retry_accept_v6"] = {"error": f"{type(exc).__name__}: {exc}"}
             results[path] = entry
         except Exception as exc:
             results[path] = {"error": f"{type(exc).__name__}: {exc}"}
