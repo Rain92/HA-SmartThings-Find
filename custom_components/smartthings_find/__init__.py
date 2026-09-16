@@ -27,7 +27,7 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_UPDATE_INTERVAL_DEFAULT,
 )
-from .utils import get_devices, get_device_location
+from .utils import get_devices, get_device_location, update_device_maps_link
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -152,6 +152,9 @@ class SmartThingsFindCoordinator(DataUpdateCoordinator):
                 dev_data = device['data']
                 tag_data = await get_device_location(self.hass, self.session, dev_data, self.entry_id)
                 tags[dev_data['device_id']] = tag_data
+                if tag_data.get('location_found'):
+                    update_device_maps_link(
+                        self.hass, dev_data['device_id'], tag_data.get('used_loc'))
             _LOGGER.debug(f"Fetched {len(tags)} locations")
             return tags
         except ConfigEntryAuthFailed as err:

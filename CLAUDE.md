@@ -61,7 +61,9 @@ All logic lives in `custom_components/smartthings_find/`:
     `ConfigEntryAuthFailed` (which triggers HA's reauth flow). Devices are discovered through the
     SmartThings *installed app* API (`_get_installed_app_id`, `_execute_installed_app`,
     `_build_installed_apps_request`) rather than the old `getDeviceList.do` endpoint, and location
-    data is picked out of a list of device "operations" by `extract_best_location` (prefers the
+    `get_device_location` picks the most recently updated entry out of the `geolocations` list (the
+  API can return several, one per reporting phone). Legacy location
+  data is picked out of a list of device "operations" by `extract_best_location` (prefers the
     newest `LOCATION`/`LASTLOC`/`OFFLINE_LOC` entry with a valid timestamp, skipping encrypted or
     dateless ones).
 
@@ -86,7 +88,12 @@ All logic lives in `custom_components/smartthings_find/`:
   and `DeviceLocationSensor`; the latter exists because a `device_tracker` state can only
   ever be a zone (`home`/`not_home`/zone name), so raw coordinates and a `google_maps_url`
   attribute (built by `google_maps_url()` in `utils.py`) are surfaced on a sensor instead.
-  It is only created for `is_tracker` devices. The `switch.py` ring toggle is optimistic (auto-turns
+  It is only created for `is_tracker` devices. For a clickable link, the coordinator also calls
+  `update_device_maps_link()` after each poll, which rewrites the device registry entry's
+  `configuration_url` (the device page's "Visit" link) to the current Maps URL - `get_devices`
+  therefore sets `configuration_url=None` for trackers and keeps the STF website link only for
+  non-trackers. The write is skipped when the URL is unchanged, so the registry is not re-saved
+  on every poll. The `switch.py` ring toggle is optimistic (auto-turns
   off after `RING_TIMEOUT_SECONDS`) because the OAuth API doesn't expose actual ring status.
 
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,

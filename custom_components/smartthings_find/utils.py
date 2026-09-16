@@ -1087,7 +1087,9 @@ async def get_devices(hass: HomeAssistant, session: aiohttp.ClientSession, entry
             manufacturer="Samsung",
             name=name,
             model=location_type or "SmartThings Find",
-            configuration_url="https://smartthingsfind.samsung.com/"
+            # Trackers get a live Google Maps link instead, set on each update by
+            # update_device_maps_link().
+            configuration_url=None if is_tracker else "https://smartthingsfind.samsung.com/"
         )
         devices += [{
             "data": {
@@ -1231,7 +1233,23 @@ async def get_device_location(hass: HomeAssistant, session: aiohttp.ClientSessio
         }
         battery_level = None
         if geo_locations:
-            geo = geo_locations[0]
+            # The API can return several geolocations for one device (different
+            # reporting phones). Picking [0] blindly could pin the device to a stale
+            # fix, so prefer the most recently updated one, like extract_best_location
+            # does for the operations list.
+            def _last_update(entry: dict):
+                raw = entry.get("lastUpdateTime") or entry.get("lastUpdateAt")
+                try:
+                    return int(raw)
+                except (TypeError, ValueError):
+                    return -1
+
+            if len(geo_locations) > 1:
+                _LOGGER.debug(
+                    "[%s] %d geolocations returned, using the newest",
+                    dev_name, len(geo_locations)
+                )
+            geo = max(geo_locations, key=_last_update)
             try:
                 used_loc["latitude"] = float(geo.get("latitude")) if geo.get("latitude") else None
                 used_loc["longitude"] = float(geo.get("longitude")) if geo.get("longitude") else None
@@ -1354,6 +1372,27 @@ def google_maps_url(latitude, longitude) -> str | None:
     if latitude is None or longitude is None:
         return None
     return f"https://www.google.com/maps/search/?api=1&query={latitude},{longitude}"
+
+
+def update_device_maps_link(hass: HomeAssistant, device_id: str, used_loc: dict | None) -> None:
+    """Point the device page's 'Visit' link at the device's current coordinates.
+
+    A device_tracker state can only ever be a zone name and HA renders neither
+    states nor attributes as links, so the device registry's configuration_url is
+    the only place a clickable link fits without a custom dashboard card. Only
+    written when it actually changes, to keep the registry from being re-saved on
+    every poll.
+    """
+    if not device_id or not used_loc:
+        return
+    url = google_maps_url(used_loc.get("latitude"), used_loc.get("longitude"))
+    if not url:
+        return
+    registry = device_registry.async_get(hass)
+    ha_dev = registry.async_get_device(identifiers={(DOMAIN, device_id)})
+    if not ha_dev or ha_dev.configuration_url == url:
+        return
+    registry.async_update_device(ha_dev.id, configuration_url=url)
 
 
 def calc_gps_accuracy(hu: float, vu: float) -> float:

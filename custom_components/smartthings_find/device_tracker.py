@@ -82,11 +82,16 @@ class SmartThingsDeviceTracker(DeviceTrackerEntity):
     
     @property
     def location_accuracy(self):
-        """Return the location accuracy of the device."""
+        """Return the location accuracy of the device.
+
+        Home Assistant computes the zone with `zone_dist - location_accuracy`, so
+        returning None raises a TypeError and leaves the entity without a state.
+        The API omits `accuracy` for some devices, so fall back to 0.
+        """
         data = self.coordinator.data.get(self.device_id, {})
         if data.get('location_found'):
-            return data.get('used_loc', {}).get('gps_accuracy', None)
-        return None
+            return data.get('used_loc', {}).get('gps_accuracy') or 0
+        return 0
 
     @property
     def battery_level(self):

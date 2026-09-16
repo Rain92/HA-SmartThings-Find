@@ -30,8 +30,13 @@ shows `home`/`not_home`/a zone name rather than coordinates. The coordinates are
 attributes on that entity, and additionally as a dedicated `sensor.<name>_location` entity whose
 state is `latitude, longitude`.
 
-Both carry a `google_maps_url` attribute. Attributes are not clickable in the UI, so to get an
-actual link on a dashboard use a Markdown card:
+Both carry a `google_maps_url` attribute. For a link you can actually click, the device page's
+**Visit** link is kept pointing at the device's current coordinates, so opening it goes straight to
+Google Maps. (This replaces the link to the SmartThings Find website for tracker devices; other
+device types keep it.)
+
+Attributes themselves are not clickable, so to get a link on a dashboard as well, use a Markdown
+card:
 
 ```yaml
 type: markdown
