@@ -9,6 +9,8 @@ Currently the integration creates these entities (trackers only):
 * `sensor`: Represents the battery level of the tag/device (not supported for earbuds!)
 * `sensor`: `<name> Location` - the raw coordinates as `latitude, longitude`, with
   `latitude`, `longitude`, `gps_accuracy`, `last_seen` and `google_maps_url` attributes.
+* `sensor`: `<name> Maps Link` - the Google Maps URL as its own entity, listed under
+  **Diagnostic** on the device page.
 * `switch`: Optimistic ring toggle (auto turns off after 120s).
 
 This integration does **not** allow you to perform actions based on button presses on the SmartTag! There are other ways to do that.
@@ -66,6 +68,19 @@ type: markdown
 content: >-
   [Open in Google Maps]({{ state_attr('sensor.schlussel_location', 'google_maps_url') }})
 ```
+
+## Renaming
+
+Renaming a tag in the SmartThings app propagates to the Home Assistant device and its entities
+the next time the integration loads (restart Home Assistant, or reload it from the integration
+page). A name you set yourself in Home Assistant always wins and is never overwritten.
+
+## Diagnostics
+
+The device page's **Download diagnostics** button returns the raw, untouched API payload for your
+tags (`raw_device`), which is the only way to tell what a given account actually exposes - Samsung's
+API is undocumented and differs between tag generations and regions. Access tokens, account
+identifiers and coordinates are redacted. This is the right thing to attach to a bug report.
 
 ## Notes on connection to the devices
 Being able to let a SmartTag ring depends on a phone/tablet nearby which forwards your request via Bluetooth. If your phone is not near your tag, you can't make it ring. The location should still update if any Galaxy device is nearby. 

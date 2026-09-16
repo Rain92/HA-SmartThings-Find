@@ -106,30 +106,36 @@ def format_ring_error(err: str | None) -> str:
     return f"Ring failed: {err}"
 
 def _sync_entity_names(hass: HomeAssistant, device_id: str, name: str) -> None:
+    """Follow a rename made in the Samsung app through to the entity names.
+
+    Entity names carry a suffix ("<name> Battery"), so they can never equal the bare
+    device name - the previous version compared them directly and therefore only ever
+    renamed the tracker, and only to undo HTML escaping. Build the expected name per
+    entity instead. A name the user set themselves (entry.name) is never touched.
+    """
     if not device_id or not name:
         return
     registry = entity_registry.async_get(hass)
-    unique_ids = (
-        ("device_tracker", f"stf_device_tracker_{device_id}"),
-        ("sensor", f"stf_device_battery_{device_id}"),
-        ("sensor", f"stf_device_location_{device_id}"),
-        ("switch", f"stf_ring_switch_{device_id}"),
-        ("button", f"stf_ring_button_{device_id}"),
-        ("button", f"stf_ring_stop_button_{device_id}"),
+    expected_names = (
+        ("device_tracker", f"stf_device_tracker_{device_id}", name),
+        ("sensor", f"stf_device_battery_{device_id}", f"{name} Battery"),
+        ("sensor", f"stf_device_location_{device_id}", f"{name} Location"),
+        ("sensor", f"stf_device_maps_link_{device_id}", f"{name} Maps Link"),
+        ("switch", f"stf_ring_switch_{device_id}", f"{name} Ring"),
+        ("button", f"stf_ring_button_{device_id}", f"{name} Ring"),
+        ("button", f"stf_ring_stop_button_{device_id}", f"{name} Stop Ring"),
     )
-    for domain, unique_id in unique_ids:
+    for domain, unique_id, expected in expected_names:
         entity_id = registry.async_get_entity_id(domain, DOMAIN, unique_id)
         if not entity_id:
             continue
         entry = registry.async_get(entity_id)
         if not entry or entry.name:
             continue
-        original = entry.original_name or ""
-        if not original or original == name:
+        if (entry.original_name or "") == expected:
             continue
-        if _html_unescape(original) != name:
-            continue
-        registry.async_update_entity(entity_id, original_name=name)
+        _LOGGER.debug("Renaming entity '%s' to '%s'", entity_id, expected)
+        registry.async_update_entity(entity_id, original_name=expected)
 
 
 def generate_code_verifier():
@@ -1075,10 +1081,13 @@ async def get_devices(hass: HomeAssistant, session: aiohttp.ClientSession, entry
              _LOGGER.debug(
                 f"Ignoring disabled device: '{name}' (disabled by {ha_dev.disabled_by})")
              continue
-        if ha_dev and not ha_dev.name_by_user:
-            current_name = ha_dev.name or ""
-            if current_name != name and _html_unescape(current_name) == name:
-                registry.async_update_device(ha_dev.id, name=name)
+        # Follow renames made in the Samsung app. The previous condition also required
+        # the current name to unescape to the new one, so it only ever undid HTML
+        # escaping and a real rename never propagated. A name the user set in HA
+        # (name_by_user) still wins.
+        if ha_dev and not ha_dev.name_by_user and (ha_dev.name or "") != name:
+            _LOGGER.info("Renaming device '%s' to '%s'", ha_dev.name, name)
+            registry.async_update_device(ha_dev.id, name=name)
         _sync_entity_names(hass, device_id, name)
         name_original = name
 

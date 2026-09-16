@@ -88,13 +88,19 @@ All logic lives in `custom_components/smartthings_find/`:
   and `DeviceLocationSensor`; the latter exists because a `device_tracker` state can only
   ever be a zone (`home`/`not_home`/zone name), so raw coordinates and a `google_maps_url`
   attribute (built by `google_maps_url()` in `utils.py`) are surfaced on a sensor instead.
-  It is only created for `is_tracker` devices. For a clickable link, the coordinator also calls
+  `DeviceMapsLinkSensor` exposes the same URL as a standalone `EntityCategory.DIAGNOSTIC` entity.
+  Both are only created for `is_tracker` devices. For a clickable link, the coordinator also calls
   `update_device_maps_link()` after each poll, which rewrites the device registry entry's
   `configuration_url` (the device page's "Visit" link) to the current Maps URL - `get_devices`
   therefore sets `configuration_url=None` for trackers and keeps the STF website link only for
   non-trackers. The write is skipped when the URL is unchanged, so the registry is not re-saved
   on every poll. The `switch.py` ring toggle is optimistic (auto-turns
   off after `RING_TIMEOUT_SECONDS`) because the OAuth API doesn't expose actual ring status.
+
+- **`diagnostics.py`** — `async_get_config_entry_diagnostics` dumps the config entry, the built
+  device list (including each tag's untouched `raw_device` payload) and the coordinator data, with
+  tokens, account identifiers and coordinates redacted via `TO_REDACT`. This is the fastest way to
+  see what a given account's API actually returns.
 
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,
   `CLIENT_ID_ONECONNECT`, `SCOPE_FIND`, `SCOPE_AUTH`), defaults (e.g.
@@ -113,6 +119,11 @@ All logic lives in `custom_components/smartthings_find/`:
 - Login requires a manual step the user can't fully automate: after signing in, Samsung redirects to
   an `ms-app://...` URI that the browser can't open; the user has to grab that exact URL from devtools
   (Network or Console tab) and paste it into the HA config flow.
+- Renames made in the Samsung app propagate on setup: `get_devices` renames the device registry
+  entry and `_sync_entity_names` renames each entity's `original_name` using a per-entity suffix
+  table. Both bail out if the user named the device/entity themselves (`name_by_user` / `entry.name`).
+  Because `get_devices` only runs at setup, a rename shows up after a restart or reload, not on the
+  next poll.
 - Access/refresh tokens are refreshed automatically on 401/403 (see `authenticated_request`); a
   refresh failure raises `ConfigEntryAuthFailed`, surfacing HA's reauth flow rather than a silent
   failure.
