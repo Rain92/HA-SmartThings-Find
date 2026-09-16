@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .utils import google_maps_url
+from .utils import google_maps_url, update_device_maps_link
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +42,18 @@ class SmartThingsDeviceTracker(DeviceTrackerEntity):
             self._attr_entity_picture = icon_url
         self.async_update = coordinator.async_add_listener(self.async_write_ha_state)
     
+    async def async_added_to_hass(self) -> None:
+        """Set the device's Maps link as soon as the device registry entry exists.
+
+        The coordinator's first refresh runs before the platforms are set up, so the
+        link it writes is wiped again when this entity is added with its DeviceInfo.
+        Re-apply it here, otherwise the device page has no link until the next poll.
+        """
+        await super().async_added_to_hass()
+        data = self.coordinator.data.get(self.device_id, {}) or {}
+        if data.get('location_found'):
+            update_device_maps_link(self.hass, self.device_id, data.get('used_loc'))
+
     def async_write_ha_state(self):
         if not self.enabled:
             _LOGGER.debug(f"Ignoring state write request for disabled entity '{self.entity_id}'")

@@ -31,9 +31,11 @@ attributes on that entity, and additionally as a dedicated `sensor.<name>_locati
 state is `latitude, longitude`.
 
 Both carry a `google_maps_url` attribute. For a link you can actually click, the device page's
-**Visit** link is kept pointing at the device's current coordinates, so opening it goes straight to
-Google Maps. (This replaces the link to the SmartThings Find website for tracker devices; other
-device types keep it.)
+**Visit** button is kept pointing at the device's current coordinates, so it opens Google Maps at
+the device's position. You will find it at the bottom of the **Device info** card, the top-left card
+on the device's page (Settings -> Devices & services -> Devices -> pick the device). It only appears
+once a location has been received at least once. (This replaces the link to the SmartThings Find
+website for tracker devices; other device types keep it.)
 
 Attributes themselves are not clickable, so to get a link on a dashboard as well, use a Markdown
 card:
