@@ -4,7 +4,7 @@
   "after_dependencies": [
     "http"
   ],
-  "version": "0.6.0",
+  "version": "0.6.1",
   "documentation": "https://github.com/Rain92/HA-SmartThings-Find",
   "issue_tracker": "https://github.com/Rain92/HA-SmartThings-Find/issues",
   "integration_type": "hub",

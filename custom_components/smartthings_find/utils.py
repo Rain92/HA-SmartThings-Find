@@ -440,13 +440,57 @@ async def probe_device_detail_endpoints(
             results[label] = {"error": f"{type(exc).__name__}: {exc}"}
 
     # Public capability API.
+    device_body = None
     for suffix in ("", "/status", "/components/main/status"):
         url = f"{SMARTTHINGS_API_BASE}/devices/{device_id}{suffix}"
         label = f"api.smartthings.com GET /v1/devices/{{id}}{suffix}"
         try:
+            entry = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
+            results[label] = entry
+            if suffix == "" and isinstance(entry.get("body"), dict):
+                device_body = entry["body"]
+        except Exception as exc:
+            results[label] = {"error": f"{type(exc).__name__}: {exc}"}
+
+    if not isinstance(device_body, dict):
+        return results
+
+    # The capability definitions say which commands each capability accepts - that is
+    # what turns a guessed write into a documented one.
+    capabilities = []
+    for component in device_body.get("components") or []:
+        for capability in component.get("capabilities") or []:
+            cap_id, version = capability.get("id"), capability.get("version", 1)
+            if cap_id and (cap_id, version) not in capabilities:
+                capabilities.append((cap_id, version))
+
+    for cap_id, version in capabilities:
+        url = f"{SMARTTHINGS_API_BASE}/capabilities/{cap_id}/{version}"
+        label = f"capability {cap_id} v{version}"
+        try:
             results[label] = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
         except Exception as exc:
             results[label] = {"error": f"{type(exc).__name__}: {exc}"}
+
+    # The presentation holds the labels the app actually renders, so it is what maps a
+    # capability to the wording the user sees ("Energiesparmodus").
+    presentation_id = device_body.get("presentationId")
+    manufacturer = device_body.get("manufacturerName")
+    if presentation_id and manufacturer:
+        query = urllib.parse.urlencode({
+            "presentationId": presentation_id,
+            "manufacturerName": manufacturer,
+        })
+        for path in ("presentation", "presentation/deviceconfig"):
+            url = f"{SMARTTHINGS_API_BASE}/{path}?{query}"
+            try:
+                results[f"api.smartthings.com GET /v1/{path}"] = await _probe_get(
+                    hass, session, entry_id, url, ACCEPT_V1
+                )
+            except Exception as exc:
+                results[f"api.smartthings.com GET /v1/{path}"] = {
+                    "error": f"{type(exc).__name__}: {exc}"
+                }
     return results
 
 
