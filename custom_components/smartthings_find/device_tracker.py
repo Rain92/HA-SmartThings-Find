@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .utils import google_maps_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,7 +100,15 @@ class SmartThingsDeviceTracker(DeviceTrackerEntity):
         device_data = self.device or {}
         used_loc = tag_data.get('used_loc') or {}
         attrs = {}
-        attrs.update(device_data)
-        attrs.update(tag_data)
+        # The raw API payloads are large, change shape between firmware versions and
+        # would be written to the recorder on every poll, so they are left out here.
+        attrs.update({k: v for k, v in device_data.items() if k != 'raw_device'})
+        attrs.update({k: v for k, v in tag_data.items() if k != 'raw_item'})
+        latitude = used_loc.get('latitude')
+        longitude = used_loc.get('longitude')
+        attrs['latitude'] = latitude
+        attrs['longitude'] = longitude
+        attrs['gps_accuracy'] = used_loc.get('gps_accuracy')
         attrs['last_seen'] = used_loc.get('gps_date')
+        attrs['google_maps_url'] = google_maps_url(latitude, longitude)
         return attrs

@@ -6,6 +6,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 
 from .const import DOMAIN
+from .utils import google_maps_url
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -16,6 +17,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     entities = []
     for device in devices:
         entities += [DeviceBatterySensor(hass, coordinator, device)]
+        # Only trackers ever report coordinates; other device classes would be
+        # permanently unknown.
+        if device['data'].get("is_tracker"):
+            entities += [DeviceLocationSensor(hass, coordinator, device)]
     async_add_entities(entities)
 
 
@@ -60,3 +65,65 @@ class DeviceBatterySensor(SensorEntity):
     def state(self):
         data = self.coordinator.data.get(self.device_id, {})
         return data.get('battery_level')
+
+
+class DeviceLocationSensor(SensorEntity):
+    """Exposes the raw coordinates of a device, plus a ready-made Google Maps link.
+
+    The device_tracker entity can only ever have a zone as its state ('home',
+    'not_home', ...), so the actual coordinates are surfaced here instead.
+    """
+
+    _attr_icon = "mdi:map-marker"
+
+    def __init__(self, hass: HomeAssistant, coordinator, device):
+        """Initialize the sensor."""
+        self.coordinator = coordinator
+        device_id = device['data'].get("device_id")
+        name = device['data'].get("name") or device_id or "SmartThings Find"
+        self._attr_unique_id = f"stf_device_location_{device_id}"
+        self._attr_name = f"{name} Location"
+        self.hass = hass
+        self.device = device['data']
+        self.device_id = device_id
+        self._attr_device_info = device['ha_dev_info']
+
+    def _used_loc(self) -> dict:
+        tag_data = self.coordinator.data.get(self.device_id, {}) or {}
+        if not tag_data.get('location_found'):
+            return {}
+        return tag_data.get('used_loc') or {}
+
+    @property
+    def available(self) -> bool:
+        """Mirror the battery sensor: unavailable if the last update failed."""
+        tag_data = self.coordinator.data.get(self.device_id, {})
+        if not tag_data:
+            _LOGGER.info(f"location sensor: tag_data none for '{self.name}'; rendering state unavailable")
+            return False
+        if not tag_data.get('update_success'):
+            _LOGGER.info(f"Last update for location sensor '{self.name}' failed; rendering state unavailable")
+            return False
+        return True
+
+    @property
+    def native_value(self):
+        used_loc = self._used_loc()
+        latitude = used_loc.get('latitude')
+        longitude = used_loc.get('longitude')
+        if latitude is None or longitude is None:
+            return None
+        return f"{latitude}, {longitude}"
+
+    @property
+    def extra_state_attributes(self):
+        used_loc = self._used_loc()
+        latitude = used_loc.get('latitude')
+        longitude = used_loc.get('longitude')
+        return {
+            'latitude': latitude,
+            'longitude': longitude,
+            'gps_accuracy': used_loc.get('gps_accuracy'),
+            'last_seen': used_loc.get('gps_date'),
+            'google_maps_url': google_maps_url(latitude, longitude),
+        }

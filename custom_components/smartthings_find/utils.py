@@ -112,6 +112,7 @@ def _sync_entity_names(hass: HomeAssistant, device_id: str, name: str) -> None:
     unique_ids = (
         ("device_tracker", f"stf_device_tracker_{device_id}"),
         ("sensor", f"stf_device_battery_{device_id}"),
+        ("sensor", f"stf_device_location_{device_id}"),
         ("switch", f"stf_ring_switch_{device_id}"),
         ("button", f"stf_ring_button_{device_id}"),
         ("button", f"stf_ring_stop_button_{device_id}"),
@@ -1346,6 +1347,13 @@ async def stop_ring_device(
         device_id = dev_data.get("st_device_id") or dev_data.get("device_id")
         return await _ring_command(hass, session, entry_id, device_id, "stop")
     return False, "unsupported_device"
+
+
+def google_maps_url(latitude, longitude) -> str | None:
+    """Build a Google Maps link for a coordinate pair, or None if it is incomplete."""
+    if latitude is None or longitude is None:
+        return None
+    return f"https://www.google.com/maps/search/?api=1&query={latitude},{longitude}"
 
 
 def calc_gps_accuracy(hu: float, vu: float) -> float:

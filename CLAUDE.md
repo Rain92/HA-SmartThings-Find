@@ -16,7 +16,7 @@ exists in this repo.
 
 A Home Assistant custom integration (`custom_components/smartthings_find`) that adds Samsung
 SmartThings Find support (SmartTags, phones, tablets, watches, earbuds) to Home Assistant via
-`device_tracker`, `sensor` (battery), and `switch` (optimistic ring toggle) entities. It works by reverse-engineered calls to Samsung's undocumented SmartThings Find / SmartThings
+`device_tracker`, `sensor` (battery + coordinates), and `switch` (optimistic ring toggle) entities. It works by reverse-engineered calls to Samsung's undocumented SmartThings Find / SmartThings
 Cloud APIs — there is no official public API, so behavior is fragile and can break whenever Samsung
 changes their backend.
 
@@ -82,7 +82,11 @@ All logic lives in `custom_components/smartthings_find/`:
 
 - **`device_tracker.py`**, **`sensor.py`**, **`switch.py`** — thin entity platforms
   reading from the shared coordinator's data and, for `switch.py`, triggering
-  ring/stop-ring requests through `utils.py`. The `switch.py` ring toggle is optimistic (auto-turns
+  ring/stop-ring requests through `utils.py`. `sensor.py` holds both `DeviceBatterySensor`
+  and `DeviceLocationSensor`; the latter exists because a `device_tracker` state can only
+  ever be a zone (`home`/`not_home`/zone name), so raw coordinates and a `google_maps_url`
+  attribute (built by `google_maps_url()` in `utils.py`) are surfaced on a sensor instead.
+  It is only created for `is_tracker` devices. The `switch.py` ring toggle is optimistic (auto-turns
   off after `RING_TIMEOUT_SECONDS`) because the OAuth API doesn't expose actual ring status.
 
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,

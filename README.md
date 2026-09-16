@@ -7,6 +7,8 @@ This integration adds support for devices from Samsung SmartThings Find. While i
 Currently the integration creates these entities (trackers only):
 * `device_tracker`: Shows the location of the tag/device.
 * `sensor`: Represents the battery level of the tag/device (not supported for earbuds!)
+* `sensor`: `<name> Location` - the raw coordinates as `latitude, longitude`, with
+  `latitude`, `longitude`, `gps_accuracy`, `last_seen` and `google_maps_url` attributes.
 * `switch`: Optimistic ring toggle (auto turns off after 120s).
 
 This integration does **not** allow you to perform actions based on button presses on the SmartTag! There are other ways to do that.
@@ -20,6 +22,23 @@ This integration does **not** allow you to perform actions based on button press
 
 ## Notes on authentication
 This integration now uses a standard OAuth 2.0 flow with PKCE to authenticate with Samsung servers. This mirrors the authentication used by official Samsung apps, providing a persistent session that automatically refreshes. You no longer need to worry about manually re-authenticating or sessions expiring unexpectedly.
+
+## Notes on the location
+
+A Home Assistant `device_tracker` can only ever have a zone as its state, so the tracker entity
+shows `home`/`not_home`/a zone name rather than coordinates. The coordinates are available as
+attributes on that entity, and additionally as a dedicated `sensor.<name>_location` entity whose
+state is `latitude, longitude`.
+
+Both carry a `google_maps_url` attribute. Attributes are not clickable in the UI, so to get an
+actual link on a dashboard use a Markdown card:
+
+```yaml
+type: markdown
+content: >-
+  [Open {{ state_attr('sensor.smarttag_location', 'friendly_name') }} in Google
+  Maps]({{ state_attr('sensor.smarttag_location', 'google_maps_url') }})
+```
 
 ## Notes on connection to the devices
 Being able to let a SmartTag ring depends on a phone/tablet nearby which forwards your request via Bluetooth. If your phone is not near your tag, you can't make it ring. The location should still update if any Galaxy device is nearby. 
