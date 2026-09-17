@@ -100,21 +100,16 @@ All logic lives in `custom_components/smartthings_find/`:
 - **`diagnostics.py`** — `async_get_config_entry_diagnostics` dumps the config entry, the built
   device list (including each tag's untouched `raw_device` payload) and the coordinator data, with
   tokens, account identifiers and coordinates redacted via `TO_REDACT`. This is the fastest way to
-  see what a given account's API actually returns. It also runs `probe_tracker_endpoints()`
-  (`utils.py`), a read-only GET sweep of the SmartThings "chaser" per-tag endpoints
-  (`CHASER_BASE_URL` = `https://client.smartthings.com/chaser`, paths in `TRACKER_PROBE_PATHS`,
-  recovered from the SmartThings APK). Chaser takes the same IoT bearer token as the installed-app
-  API. The sweep is GET-only and never raises - a failing probe records its error and the rest
-  continue. Nothing else in the integration calls chaser. The observed results per endpoint are
-  recorded in a comment above `TRACKER_PROBE_PATHS`; the short version is that only the two global
-  endpoints (`/trackers/categories`, `/utsconfig`) are readable, every per-tag endpoint is 403 or
-  405, and no power-saving setting is reachable. Do not re-run this investigation from scratch.
+  see what a given account's API actually returns. It issues no requests of its own — it only dumps
+  state the integration already holds.
 
 - **`binary_sensor.py`** — `DevicePowerSavingSensor`, the tag's power saving mode
   ("Energiesparmodus"), read from `bleD2D.metadata.activeMode.mode` via
   `get_device_ble_metadata()` / `get_power_saving_state()` in `utils.py`. It is a binary_sensor
-  and not a switch because only the read path is confirmed; see "Notes on power saving mode" in
-  the README for what was ruled out and why. The coordinator fetches the metadata blob per
+  and not a switch because only the read path is confirmed. The comment above
+  `get_device_ble_metadata()` records what was ruled out — the chaser per-tag endpoints are all
+  403/405, and a re-signed app cannot be used to capture the write because Samsung rejects it with
+  `AUT_1708`. Do not re-run that investigation. The coordinator fetches the metadata blob per
   tracker on each poll and stores it under `ble_metadata`.
 
 - **`const.py`** — all config keys, Samsung client IDs/scopes (`CLIENT_ID_FIND`, `CLIENT_ID_AUTH`,

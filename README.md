@@ -79,11 +79,13 @@ The tag's power saving mode is exposed read-only, as a `binary_sensor`. It is re
 saving), which was confirmed by toggling the setting in the SmartThings app and diffing the
 payload: that single field flips and nothing else does.
 
-Writing it is not supported. The SmartThings app sets it through its own tracker-metadata
-update, whose request body is not reproducible from the public API - `/chaser/trackers/{id}/metadata`
-returns 403 for our token. The SmartThings *capability* values (`tag.uwbActivation` and the
-other `tag.*` ones) are all `null` for this tag and do not move when the setting is toggled,
-so they are not usable either.
+Writing it is not supported, and is unlikely to become supported. The SmartThings app sets it
+through its own tracker-metadata update. Every per-tag endpoint of the `chaser` API is 403 or 405
+for our token, the SmartThings *capability* values (`tag.uwbActivation` and the other `tag.*` ones)
+are all `null` and do not move when the setting is toggled, and the app's own request cannot be
+captured from a re-signed build because Samsung validates the signing certificate server-side and
+rejects it with `AUT_1708`. Toggle it in the SmartThings app; Home Assistant will show the new
+state on the next poll.
 
 ## Renaming
 
@@ -97,12 +99,6 @@ The device page's **Download diagnostics** button returns the raw, untouched API
 tags (`raw_device`), which is the only way to tell what a given account actually exposes - Samsung's
 API is undocumented and differs between tag generations and regions. Access tokens, account
 identifiers and coordinates are redacted. This is the right thing to attach to a bug report.
-
-It also includes `tracker_endpoint_probe`: a read-only GET against each per-tag endpoint of the
-SmartThings "chaser" API (`metadata`, `searchingstatus`, `button/options`, `timer`, `category`,
-`firmware`), recovered from the SmartThings app. The integration does not use these during normal
-operation - they are probed only when you download diagnostics, and only with GET, so nothing on
-the tag is changed. This is how to find out which per-tag settings your account actually exposes.
 
 ## Notes on connection to the devices
 Being able to let a SmartTag ring depends on a phone/tablet nearby which forwards your request via Bluetooth. If your phone is not near your tag, you can't make it ring. The location should still update if any Galaxy device is nearby. 

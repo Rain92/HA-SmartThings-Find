@@ -281,116 +281,21 @@ async def _smartthings_get_json(
         return res.status, await res.json()
 
 
-# Base URL of the "chaser" tracker API, the surface the SmartThings app uses for
-# per-tag settings. It takes the same IoT bearer token as the installed-app API.
-CHASER_BASE_URL = "https://client.smartthings.com/chaser"
-
-# Read-only endpoints, recovered from the SmartThings APK's string table. Probed for
-# diagnostics only, to find out what settings an account actually exposes for a tag -
-# the integration does not use them during normal operation. GET only, on purpose: none
-# of these change anything on the tag.
+# Investigation note, so this is not repeated. The SmartThings app's per-tag settings
+# live behind the "chaser" API (https://client.smartthings.com/chaser), whose paths were
+# recovered from the app's dex string tables:
+#   /trackers/{id}/{metadata,searchingstatus,button/options,timer,category,firmware}
+# Probed read-only against a SmartTag2 (UWB_TAG) with our IoT bearer token: only the two
+# global endpoints (/trackers/categories, /utsconfig) return 200. Every per-tag endpoint
+# is 403 (metadata, with Accept v1 and v6 alike - a real permission boundary) or 405
+# (resource exists, GET not allowed), and Samsung sends no Allow header, so the accepted
+# verb cannot be discovered without sending one. No power-saving setting is reachable
+# there; it lives in bleD2D.metadata below.
 #
-# Observed against a SmartTag2 (UWB_TAG), SmartThings app 1.8.47.24, with our IoT token:
-#   /trackers/categories          200  global category list, localised
-#   /utsconfig                    200  {scanDuration, numOfScanTimes, rssiFilter, brand}
-#   /trackers/{id}/metadata       403  empty body, with Accept v1 AND v6 - a real
-#                                      permission boundary, not a version mismatch
-#   /trackers/{id}/searchingstatus,
-#   /button/options, /timer,
-#   /category, /firmware          405  resource exists, GET not allowed. Samsung's
-#                                      gateway sends no Allow header, so the accepted
-#                                      verb cannot be discovered without sending one
-#   /trackers/{id}/pprecords,
-#   /lostmessage                  404
-#
-# Conclusion: no per-tag power-saving ("Energiesparmodus") setting is reachable from any
-# endpoint we can read. The SmartTag settings UI is a runtime-downloaded SmartThings
-# plugin, so its request payloads are not in the APK either. Settling it needs a capture
-# of the app's own traffic.
-TRACKER_PROBE_PATHS = (
-    "/trackers/{device_id}/metadata",
-    "/trackers/{device_id}/searchingstatus",
-    "/trackers/{device_id}/button/options",
-    "/trackers/{device_id}/timer",
-    "/trackers/{device_id}/category",
-    "/trackers/{device_id}/firmware",
-    "/trackers/{device_id}/pprecords",
-    "/trackers/{device_id}/lostmessage",
-    "/trackers/categories",
-    "/utsconfig",
-)
-
-# Some SmartThings endpoints reject the default v1 Accept and need v6.
-ACCEPT_V1 = "application/vnd.smartthings+json;v=1"
-ACCEPT_V6 = "application/vnd.smartthings+json;v=6"
-
-
-async def _probe_get(
-    hass: HomeAssistant,
-    session: aiohttp.ClientSession,
-    entry_id: str,
-    url: str,
-    accept: str
-) -> dict:
-    """Single GET for the diagnostics probe. Records status, Allow header and body."""
-    headers = _get_smartthings_headers(hass, entry_id)
-    headers["Accept"] = accept
-    async with session.get(
-        url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)
-    ) as res:
-        status = res.status
-        # A 405 names the resource but not the verb; the Allow header is what tells us
-        # which method the endpoint actually wants.
-        allow = res.headers.get("Allow") or res.headers.get("allow")
-        text = await res.text()
-    result: dict = {"status": status}
-    if allow:
-        result["allow"] = allow
-    try:
-        result["body"] = json.loads(text)
-    except ValueError:
-        result["body"] = text[:2000]
-    return result
-
-
-async def probe_tracker_endpoints(
-    hass: HomeAssistant,
-    session: aiohttp.ClientSession,
-    entry_id: str,
-    device_id: str
-) -> dict:
-    """GET each known chaser tracker endpoint and report what comes back.
-
-    Purely diagnostic. Never raises - a failing probe records its error and the rest
-    continue, so downloading diagnostics can't break because Samsung changed a path.
-    """
-    results: dict[str, dict] = {}
-    if not device_id:
-        return results
-
-    refreshed = False
-    for template in TRACKER_PROBE_PATHS:
-        path = template.format(device_id=device_id)
-        url = f"{CHASER_BASE_URL}{path}"
-        try:
-            entry = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
-            if entry["status"] in (401, 403) and not refreshed:
-                await refresh_iot_token(hass, session, entry_id)
-                refreshed = True
-                entry = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
-            # A 403 here may just be the wrong Accept version rather than a real
-            # permission problem, so note what v6 says too.
-            if entry["status"] == 403:
-                try:
-                    entry["retry_accept_v6"] = await _probe_get(
-                        hass, session, entry_id, url, ACCEPT_V6
-                    )
-                except Exception as exc:
-                    entry["retry_accept_v6"] = {"error": f"{type(exc).__name__}: {exc}"}
-            results[path] = entry
-        except Exception as exc:
-            results[path] = {"error": f"{type(exc).__name__}: {exc}"}
-    return results
+# Writing the setting is not reproducible: the app does it through its own
+# tracker-metadata update, and a re-signed build of the app cannot be used to capture
+# that request because Samsung rejects it server-side with AUT_1708 (invalid client -
+# the signing certificate is validated against a registered whitelist).
 
 
 async def get_device_ble_metadata(
@@ -465,103 +370,6 @@ def get_power_saving_state(metadata: dict | None) -> bool | None:
 # Public SmartThings API. A tag's settings screen renders its capability list (that is
 # why "Battery" shows up there), and capability values are readable from here.
 SMARTTHINGS_API_BASE = "https://api.smartthings.com/v1"
-
-
-async def probe_device_detail_endpoints(
-    hass: HomeAssistant,
-    session: aiohttp.ClientSession,
-    entry_id: str,
-    device_id: str
-) -> dict:
-    """Read-only probe of the device detail / capability endpoints.
-
-    Two surfaces: the installed-app '/devices/{id}/details' and '/main' routes found in
-    the SmartThings APK, and the public capability API. GET only; nothing here changes
-    anything on the tag.
-    """
-    results: dict[str, dict] = {}
-    if not device_id:
-        return results
-
-    # Installed-app routes. The uri/extraUri split is not documented, so try the whole
-    # path as uri and the split form, and report whichever answers.
-    attempts = (
-        (f"/devices/{device_id}/details", None),
-        ("/devices", f"/{device_id}/details"),
-        (f"/devices/{device_id}/main", None),
-        ("/devices", f"/{device_id}/main"),
-    )
-    for uri, extra_uri in attempts:
-        # Both forms resolve to the same path, so key them by the split as well or one
-        # result silently overwrites the other.
-        label = f"installedapp GET uri={uri} extraUri={extra_uri}"
-        try:
-            status, response = await _execute_installed_app(
-                hass, session, entry_id, "GET", uri, extra_uri=extra_uri
-            )
-            app_status, message, error_code = _parse_installed_apps_response(response)
-            results[label] = {
-                "http_status": status,
-                "app_status": app_status,
-                "error_code": error_code,
-                "body": message if message is not None else str(response)[:2000],
-            }
-        except Exception as exc:
-            results[label] = {"error": f"{type(exc).__name__}: {exc}"}
-
-    # Public capability API.
-    device_body = None
-    for suffix in ("", "/status", "/components/main/status"):
-        url = f"{SMARTTHINGS_API_BASE}/devices/{device_id}{suffix}"
-        label = f"api.smartthings.com GET /v1/devices/{{id}}{suffix}"
-        try:
-            entry = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
-            results[label] = entry
-            if suffix == "" and isinstance(entry.get("body"), dict):
-                device_body = entry["body"]
-        except Exception as exc:
-            results[label] = {"error": f"{type(exc).__name__}: {exc}"}
-
-    if not isinstance(device_body, dict):
-        return results
-
-    # The capability definitions say which commands each capability accepts - that is
-    # what turns a guessed write into a documented one.
-    capabilities = []
-    for component in device_body.get("components") or []:
-        for capability in component.get("capabilities") or []:
-            cap_id, version = capability.get("id"), capability.get("version", 1)
-            if cap_id and (cap_id, version) not in capabilities:
-                capabilities.append((cap_id, version))
-
-    for cap_id, version in capabilities:
-        url = f"{SMARTTHINGS_API_BASE}/capabilities/{cap_id}/{version}"
-        label = f"capability {cap_id} v{version}"
-        try:
-            results[label] = await _probe_get(hass, session, entry_id, url, ACCEPT_V1)
-        except Exception as exc:
-            results[label] = {"error": f"{type(exc).__name__}: {exc}"}
-
-    # The presentation holds the labels the app actually renders, so it is what maps a
-    # capability to the wording the user sees ("Energiesparmodus").
-    presentation_id = device_body.get("presentationId")
-    manufacturer = device_body.get("manufacturerName")
-    if presentation_id and manufacturer:
-        query = urllib.parse.urlencode({
-            "presentationId": presentation_id,
-            "manufacturerName": manufacturer,
-        })
-        for path in ("presentation", "presentation/deviceconfig"):
-            url = f"{SMARTTHINGS_API_BASE}/{path}?{query}"
-            try:
-                results[f"api.smartthings.com GET /v1/{path}"] = await _probe_get(
-                    hass, session, entry_id, url, ACCEPT_V1
-                )
-            except Exception as exc:
-                results[f"api.smartthings.com GET /v1/{path}"] = {
-                    "error": f"{type(exc).__name__}: {exc}"
-                }
-    return results
 
 
 async def _ensure_smartthings_user_info(
